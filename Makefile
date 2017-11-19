@@ -15,7 +15,8 @@
 
 ################################################
 # sveinse: Files to keep from scrub
-FILES_KEEP = patches/
+FILES_KEEP = patches img
+FILES_FILTER_OUT =
 
 SHELL := /bin/bash
 
@@ -134,14 +135,14 @@ PRELOADER_DIR := $(OUTPUT_DIR)/preloader
 # sveinse: Patterns to keep from scrub_cleaning. It is aggressive, so it is important to keep
 #          this updated.
 AR_REGEX += \
-	Makefile ip readme.txt ds5 \
+	Makefile ip readme.* ds5 \
 	altera_avalon* *.qpf *.qsf *.sdc *.v *.sv *.vhd *.qsys *.tcl *.terp *.stp \
 	*.sed quartus.ini *.sof *.rbf *.sopcinfo *.jdi $(OUTPUT_DIR) \
 	hps_isw_handoff */*.svd */synthesis/*.svd */synth/*.svd *.dts *.dtb *.xml \
 	src *.cdf *.qdf boot board_info $(FILES_KEEP) \
 	$(SOFTWARE_DIR)
 
-AR_FILTER_OUT += %_tb.qsys
+AR_FILTER_OUT += %_tb.qsys $(FILES_FILTER_OUT)
 ################################################
 
 
