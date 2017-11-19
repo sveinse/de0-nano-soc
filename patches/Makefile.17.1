@@ -5,17 +5,7 @@
 # Copyright Altera (c) 2017
 # All Rights Reserved
 #
-# Modificated from stock 17.1 Makefile
-# by Svein Seldal <sveinse@seldal.com>
-# Mod v1, 2017-11-19
-#
-# Local edits are labeled with "sveinse:"
-#
 ################################################
-
-################################################
-# sveinse: Files to keep from scrub
-FILES_KEEP = patches/
 
 SHELL := /bin/bash
 
@@ -30,7 +20,6 @@ CHMOD := chmod
 CP := cp -rf
 ECHO := echo
 DATE := date
-DOS2UNIX := dos2unix
 FIND := find
 GREP := grep
 HEAD := head
@@ -119,26 +108,19 @@ clean:
 ################################################
 # Archiving & Cleaning your QuartusII/QSys Project
 
-# sveinse: Output artefacts dir
-OUTPUT_DIR := output_files
-OUTPUT_BOOT := $(OUTPUT_DIR)/boot
-
 AR_TIMESTAMP := $(if $(SOCEDS_VERSION),$(subst .,_,$(SOCEDS_VERSION))_)$(subst $(SPACE),,$(shell $(DATE) +%m%d%Y_%k%M%S))
 
 AR_DIR := tgz
 AR_FILE := $(AR_DIR)/$(basename $(firstword $(wildcard *.qpf)))_$(AR_TIMESTAMP).tar.gz
 
 SOFTWARE_DIR := software
-PRELOADER_DIR := $(OUTPUT_DIR)/preloader
+PRELOADER_DIR := $(SOFTWARE_DIR)/preloader
 
-# sveinse: Patterns to keep from scrub_cleaning. It is aggressive, so it is important to keep
-#          this updated.
 AR_REGEX += \
 	Makefile ip readme.txt ds5 \
 	altera_avalon* *.qpf *.qsf *.sdc *.v *.sv *.vhd *.qsys *.tcl *.terp *.stp \
-	*.sed quartus.ini *.sof *.rbf *.sopcinfo *.jdi $(OUTPUT_DIR) \
+	*.sed quartus.ini *.sof *.rbf *.sopcinfo *.jdi output_files \
 	hps_isw_handoff */*.svd */synthesis/*.svd */synth/*.svd *.dts *.dtb *.xml \
-	src *.cdf *.qdf boot board_info $(FILES_KEEP) \
 	$(SOFTWARE_DIR)
 
 AR_FILTER_OUT += %_tb.qsys
@@ -214,7 +196,7 @@ QUARTUS_MISC_SOURCE := $(wildcard *.stp *.sdc)
 QUARTUS_PIN_ASSIGNMENTS_STAMP := $(call get_stamp_target,quartus_pin_assignments)
 QUARTUS_DEPS += $(QUARTUS_QPF) $(QUARTUS_QSF) $(QUARTUS_HDL_SOURCE) $(QUARTUS_MISC_SOURCE) $(QSYS_STAMP) $(QSYS_QIP) $(QUARTUS_PIN_ASSIGNMENTS_STAMP)
 
-QUARTUS_SOF := $(OUTPUT_DIR)/$(QUARTUS_BASE).sof
+QUARTUS_SOF := output_files/$(QUARTUS_BASE).sof
 QUARTUS_STAMP := $(call get_stamp_target,quartus)
 
 .PHONY: quartus_compile
@@ -312,7 +294,7 @@ create_rbf:
 
 
 ifeq ($(HAVE_QUARTUS),1)
-SCRUB_CLEAN_FILES += $(QUARTUS_SOF) $(QUARTUS_RBF) $(OUTPUT_DIR) hps_isw_handoff
+SCRUB_CLEAN_FILES += $(QUARTUS_SOF) $(QUARTUS_RBF) output_files hps_isw_handoff
 endif
 
 ################################################
@@ -464,21 +446,9 @@ PRELOADER_EXTRA_ARGS += \
 	--set spl.boot.SDRAM_SCRUBBING true
 endif
 
-# sveinse: Add support for FAT
-PRELOADER_FAT_SUPPORT ?= 1
-ifeq ($(PRELOADER_FAT_SUPPORT),1)
-PRELOADER_EXTRA_ARGS += --set spl.boot.FAT_SUPPORT true
-endif
-
-PRELOADER_EXTRA_ARGS += --set spl.boot.FAT_LOAD_PAYLOAD_NAME u-boot.img
 
 .PHONY: preloader
 preloader: $(PRELOADER_STAMP)
-
-# sveinse: Add clean for preloader
-.PHONY: preloader-clean
-preloader-clean:
-	$(RM) -rf $(PRELOADER_DIR) $(PRELOADER_STAMP) $(UBOOT_STAMP)
 
 # Create and build preloader with watchdog disabled.
 # This is useful for board bring up and troubleshooting.
@@ -577,9 +547,8 @@ sd-update-preloader-uboot: sd-update-preloader sd-update-uboot
 DTS.SOPC2DTS := sopc2dts
 DTS.DTC := dtc
 
-# sveinse: Use our board info files checked into git
-DTS.BOARDINFO ?= board_info/$(QSYS_BASE)_board_info.xml
-DTS.COMMON ?= board_info/hps_common_board_info.xml
+DTS.BOARDINFO ?= $(QSYS_BASE)_board_info.xml
+DTS.COMMON ?= hps_common_board_info.xml
 
 DTS.EXTRA_DEPS += $(DTS.BOARDINFO) $(DTS.COMMON)
 
@@ -595,7 +564,7 @@ endef
 
 
 # Device Tree Source (dts)
-DEVICE_TREE_SOURCE := $(patsubst %.sopcinfo,$(OUTPUT_DIR)/%.dts,$(QSYS_SOPCINFO))
+DEVICE_TREE_SOURCE := $(patsubst %.sopcinfo,%.dts,$(QSYS_SOPCINFO))
 
 HELP_TARGETS += dts
 dts.HELP := Generate a device tree for this qsys design
@@ -607,12 +576,12 @@ ifeq ($(HAVE_QSYS),1)
 $(DEVICE_TREE_SOURCE): $(QSYS_STAMP)
 endif
 
-$(DEVICE_TREE_SOURCE): $(OUTPUT_DIR)/%.dts: %.sopcinfo $(DTS.EXTRA_DEPS)
+$(DEVICE_TREE_SOURCE): %.dts: %.sopcinfo $(DTS.EXTRA_DEPS)
 	$(call dts.sopc2dts,$<,$@)
 
 
 # Device Tree Blob (dtb)
-DEVICE_TREE_BLOB := $(patsubst %.sopcinfo,$(OUTPUT_DIR)/%.dtb,$(QSYS_SOPCINFO))
+DEVICE_TREE_BLOB := $(patsubst %.sopcinfo,%.dtb,$(QSYS_SOPCINFO))
 
 HELP_TARGETS += dtb
 dtb.HELP := Generate a device tree blob for this qsys design
@@ -624,7 +593,7 @@ ifeq ($(HAVE_QSYS),1)
 $(DEVICE_TREE_BLOB): $(QSYS_STAMP)
 endif
 
-$(DEVICE_TREE_BLOB): $(OUTPUT_DIR)/%.dtb: $(OUTPUT_DIR)/%.dts
+$(DEVICE_TREE_BLOB): %.dtb: %.dts
 	$(DTS.DTC) -I dts -O dtb -o $@ $<
 
 SCRUB_CLEAN_FILES += $(DEVICE_TREE_SOURCE) $(DEVICE_TREE_BLOB)
@@ -633,9 +602,7 @@ SCRUB_CLEAN_FILES += $(DEVICE_TREE_SOURCE) $(DEVICE_TREE_BLOB)
 
 
 ################################################
-
-# sveinse: Disable, the project provides its own
-disable.boot.script: Makefile
+boot.script: Makefile
 	@$(RM) $@
 	@$(ECHO) "Generating $@"
 	@$(ECHO) "fatload mmc 0:1 \$$fpgadata $(QUARTUS_RBF);" >>$@
@@ -649,102 +616,23 @@ ifeq ($(wildcard $(UBOOT_MKIMAGE)),)
 $(UBOOT_MKIMAGE): $(PRELOADER_STAMP)
 endif
 
-################################################
-# sveinse: Generate boot script from sources
-.PHONY: u-boot.scr
-u-boot.scr: $(OUTPUT_BOOT)/u-boot.scr
-
-# sveinse: Generate the bootscript 
-$(OUTPUT_BOOT)/boot.script: boot/boot.script
-	@$(MKDIR) $(@D)
-	$(DOS2UNIX) -n $< $@
-$(OUTPUT_BOOT)/u-boot.scr: $(OUTPUT_BOOT)/boot.script $(UBOOT_MKIMAGE)
+u-boot.scr: boot.script $(UBOOT_MKIMAGE)
 	$(UBOOT_MKIMAGE) -A arm -O linux -T script -C none -a 0 -e 0 -n "bootscript" -d $< $@
 
-# sveinse: Want everything in the output dir
-SD_FAT_TGZ ?= $(OUTPUT_DIR)/sd_fat.tar.gz
-
-# sveinse: Copy everything to $(OUTPUT_BOOT) to collect the boot files
-SD_FAT_TGZ_DEPS += \
-	$(OUTPUT_BOOT)/boot.script \
-	$(OUTPUT_BOOT)/u-boot.scr \
-	$(OUTPUT_BOOT)/$(notdir $(PRELOADER_BIN)) \
-	$(OUTPUT_BOOT)/$(notdir $(NEXTSTAGE_BIN)) \
-	$(OUTPUT_BOOT)/$(notdir $(QUARTUS_RBF)) \
-	$(OUTPUT_BOOT)/$(notdir $(QUARTUS_SOF)) \
-	$(OUTPUT_BOOT)/$(notdir $(DEVICE_TREE_SOURCE)) \
-	$(OUTPUT_BOOT)/$(notdir $(DEVICE_TREE_BLOB)) \
-
-# sveinse: Collect files from project into 
-$(OUTPUT_BOOT)/$(notdir $(PRELOADER_BIN)): $(PRELOADER_STAMP)
-	cp -f $(PRELOADER_BIN) $@
-$(OUTPUT_BOOT)/$(notdir $(NEXTSTAGE_BIN)): $(UBOOT_STAMP)
-	cp -f $(NEXTSTAGE_BIN) $@
-$(OUTPUT_BOOT)/$(notdir $(QUARTUS_RBF)): $(QUARTUS_RBF)
-	cp -f $^ $@
-$(OUTPUT_BOOT)/$(notdir $(QUARTUS_SOF)): $(QUARTUS_SOF)
-	cp -f $^ $@
-$(OUTPUT_BOOT)/$(notdir $(DEVICE_TREE_BLOB)): $(DEVICE_TREE_BLOB)
-	cp -f $^ $@
-$(OUTPUT_BOOT)/$(notdir $(DEVICE_TREE_SOURCE)): $(DEVICE_TREE_SOURCE)
-	cp -f $^ $@
-
-.PHONY: boot
-boot: $(SD_FAT_TGZ_DEPS)
+SD_FAT_TGZ ?= sd_fat.tar.gz
+SD_FAT_TGZ_DEPS += u-boot.scr boot.script $(QUARTUS_RBF) $(DEVICE_TREE_BLOB)
 
 $(SD_FAT_TGZ): $(SD_FAT_TGZ_DEPS)
 	@$(RM) $@
 	@$(MKDIR) $(@D)
-	$(TAR) -C $(OUTPUT_DIR)/boot -czf $@ .
+	$(TAR) -czf $@ $^
 
 .PHONY: sd-fat
 sd-fat: $(SD_FAT_TGZ)
 
-HELP_TARGETS += sd-fat
-sd-fat.HELP := Make a tgz ($(SD_FAT_TGZ)) containing the boot partition
-
 AR_FILES += $(wildcard $(SD_FAT_TGZ))
 
 SCRUB_CLEAN_FILES += $(SD_FAT_TGZ)
-
-################################################
-# sveinse: Add fpga tgz for output files
-
-FPGA_TGZ ?= $(OUTPUT_DIR)/fpga_files.tar.gz
-
-FPGA_TGZ_DEPS += \
-	$(QUARTUS_STAMP) \
-
-.PHONY: fpga fpga-tgz fpga-unpack
-fpga fpga-tgz: $(FPGA_TGZ)
-
-$(FPGA_TGZ): $(FPGA_TGZ_DEPS)
-	@$(RM) $@
-	@$(MKDIR) $(@D)
-	$(TAR) -czf $@ \
-		$(wildcard $(QUARTUS_SOF)) \
-		$(wildcard *.sopcinfo) \
-		$(wildcard hps_isw_handoff/*)
-
-HELP_TARGETS += fpga-tgz
-fpga-tgz.HELP := Make a tgz ($(FPGA_TGZ)) with the FPGA project output for later use
-
-fpga-unpack:
-	tar -xvf $(FPGA_TGZ)
-	$(MAKE) quartus_ok
-
-HELP_TARGETS += fpga-unpack
-fpga-unpack.HELP := Unpack existing FPGA_TGZ= to allow building boot files without compiling FPGA project
-
-# sveinse: Allow make quartus_ok to touch any stamps generated by manual
-# Quartus use to prevent Quartus/Qsys rebuilds when building preloader and
-# bootloader from a pre-built image.
-.PHONY: quartus_ok
-quartus_ok:
-	if [ -e $(QUARTUS_SOF) ]; then \
-		$(MKDIR) -p $(dir $(QUARTUS_STAMP)); \
-		$(TOUCH) $(QSYS_STAMP) $(QUARTUS_STAMP) $(QUARTUS_PIN_ASSIGNMENTS_STAMP); \
-	fi
 
 ################################################
 
@@ -780,7 +668,6 @@ scrub scrub_clean:
 .PHONY: tgz_scrub_clean
 tgz_scrub_clean:
 	$(FIND) $(SOFTWARE_DIR) \( -name '*.o' -o -name '.depend*' -o -name '*.d' -o -name '*.dep' \) -delete || true
-	$(FIND) $(PRELOADER_DIR) \( -name '*.o' -o -name '.depend*' -o -name '*.d' -o -name '*.dep' \) -delete || true
 	$(MAKE) tgz AR_FILE=$(AR_FILE)
 	$(MAKE) -s scrub_clean
 	$(TAR) -xzf $(AR_FILE)

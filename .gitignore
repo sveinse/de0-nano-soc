@@ -1,0 +1,26 @@
+# Quartus directories
+db/
+incremental_db/
+greybox_tmp/
+
+# Results
+output_files/
+
+# Generated files
+*_pin_model_dump.txt
+*.qws
+*.rpt
+
+# QSys file
+soc_system/
+.qsys_edit/
+*.sopcinfo
+hps_sdram_*.txt
+hps_sdram_*.csv
+hps_isw_handoff/
+
+# EDS generated files
+include/
+
+# Build system
+stamp/
