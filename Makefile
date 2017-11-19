@@ -2,7 +2,7 @@
 #
 # Makefile to Manage QuartusII/QSys Design
 #
-# Copyright Altera (c) 2014
+# Copyright Altera (c) 2017
 # All Rights Reserved
 #
 ################################################
@@ -118,9 +118,9 @@ PRELOADER_DIR := $(SOFTWARE_DIR)/preloader
 
 AR_REGEX += \
 	Makefile ip readme.txt ds5 \
-	altera_avalon* *.qpf *.qsf *.sdc *.v *.sv *.vhd *.qsys *.tcl *.stp \
+	altera_avalon* *.qpf *.qsf *.sdc *.v *.sv *.vhd *.qsys *.tcl *.terp *.stp \
 	*.sed quartus.ini *.sof *.rbf *.sopcinfo *.jdi output_files \
-	hps_isw_handoff */*.svd */synthesis/*.svd *.dts *.dtb *.xml \
+	hps_isw_handoff */*.svd */synthesis/*.svd */synth/*.svd *.dts *.dtb *.xml \
 	$(SOFTWARE_DIR)
 
 AR_FILTER_OUT += %_tb.qsys
@@ -140,7 +140,7 @@ $(error ERROR: QSYS_FILE *.qsys file not set and could not be discovered)
 endif
 QSYS_DEPS += $(wildcard *.qsys)
 QSYS_BASE := $(basename $(QSYS_FILE))
-QSYS_QIP := $(QSYS_BASE)/synthesis/$(QSYS_BASE).qip
+QSYS_QIP := $(wildard $(QSYS_BASE)/synthesis/$(QSYS_BASE).qip) $(wildcard $(QSYS_BASE)/$(QSYS_BASE).qip)
 QSYS_SOPCINFO := $(QSYS_BASE).sopcinfo
 QSYS_STAMP := $(call get_stamp_target,qsys)
 
@@ -220,7 +220,7 @@ $(QUARTUS_PIN_ASSIGNMENTS_STAMP): $(QSYS_STAMP)
 
 ifeq ($(QUARTUS_ENABLE_PIN_ASSIGNMENTS_APPLY),1)
 
-QUARTUS_TCL_PIN_ASSIGNMENTS = $(wildcard $(QSYS_BASE)/synthesis/submodules/*_pin_assignments.tcl)
+QUARTUS_TCL_PIN_ASSIGNMENTS = $(wildcard $(QSYS_BASE)/synthesis/submodules/*_pin_assignments.tcl) $(wildcard $(QSYS_BASE)/synth/submodules/*_pin_assignments.tcl)
 QUARTUS_TCL_PIN_ASSIGNMENTS_APPLY_TARGETS = $(patsubst %,quartus_apply_tcl-%,$(QUARTUS_TCL_PIN_ASSIGNMENTS))
 
 .PHONY: quartus_apply_tcl_pin_assignments
@@ -229,7 +229,7 @@ quartus_apply_tcl_pin_assignments: $(QUARTUS_TCL_PIN_ASSIGNMENTS_APPLY_TARGETS)
 .PHONY: $(QUARTUS_TCL_PIN_ASSIGNMENTS_APPLY_TARGETS)
 $(QUARTUS_TCL_PIN_ASSIGNMENTS_APPLY_TARGETS): quartus_apply_tcl-%: %
 	@$(ECHO) "Applying $<... to $(QUARTUS_QPF)..."
-	quartus_sh -t $< $(QUARTUS_QPF)
+	quartus_sta -t $< $(QUARTUS_QPF)
 
 endif # QUARTUS_ENABLE_PIN_ASSIGNMENTS_APPLY == 1
 ######
@@ -279,18 +279,18 @@ endif
 
 QUARTUS_CPF_ENABLE_COMPRESSION ?= 1
 ifeq ($(QUARTUS_CPF_ENABLE_COMPRESSION),1)
-QUARTUS_CPF_ARGS += bitstream_compression=on
+QUARTUS_CPF_ARGS += -o bitstream_compression=on
 endif
 
 $(QUARTUS_RBF): %.rbf: %.sof
-	quartus_cpf -c -o $(QUARTUS_CPF_ARGS) $< $@
+	quartus_cpf -c $(QUARTUS_CPF_ARGS) $< $@
 
 .PHONY: rbf
 rbf: $(QUARTUS_RBF)
 
 .PHONY: create_rbf
 create_rbf:
-	quartus_cpf -c -o $(QUARTUS_CPF_ARGS) $(QUARTUS_SOF) $(QUARTUS_RBF)
+	quartus_cpf -c $(QUARTUS_CPF_ARGS) $(QUARTUS_SOF) $(QUARTUS_RBF)
 
 
 ifeq ($(HAVE_QUARTUS),1)
@@ -307,15 +307,26 @@ endif
 #    you've made to your qsys or your quartus project
 #
 QSYS_QSYS_GEN := $(firstword $(wildcard create_*_qsys.tcl))
+QUARTUS_TOP_GEN := $(firstword $(wildcard create_*_top.tcl))
 QUARTUS_QSF_QPF_GEN := $(firstword $(wildcard create_*_quartus.tcl))
 
 .PHONY: quartus_generate_qsf_qpf
 ifneq ($(QUARTUS_QSF_QPF_GEN),)
 quartus_generate_qsf_qpf: $(QUARTUS_QSF_QPF_GEN)
 	$(RM) $(QUARTUS_QSF) $(QUARTUS_QPF)
-	quartus_sh --script=$<
+	quartus_sh --script=$< $(QUARTUS_TCL_ARGS)
 else
 quartus_generate_qsf_qpf:
+	@$(ECHO) "Make target '$@' is not supported for this design"
+endif
+
+.PHONY: quartus_generate_top
+ifneq ($(QUARTUS_TOP_GEN),)
+quartus_generate_top: $(QUARTUS_TOP_GEN)
+	@$(RM) *_top.v
+	quartus_sh --script=$< $(QUARTUS_TCL_ARGS)
+else
+quartus_generate_top:
 	@$(ECHO) "Make target '$@' is not supported for this design"
 endif
 
@@ -330,7 +341,7 @@ ifneq ($(QSYS_QSYS_GEN),)
 
 qsys_generate_qsys: $(QSYS_QSYS_GEN)
 	$(RM) $(QSYS_FILE)
-	qsys-script --script=$<
+	qsys-script --script=$< $(QSYS_TCL_ARGS)
 else
 qsys_generate_qsys:
 	@$(ECHO) "Make target '$@' is not supported for this design"
@@ -428,6 +439,14 @@ ifeq ($(PRELOADER_DISABLE_WATCHDOG),1)
 PRELOADER_EXTRA_ARGS += --set spl.boot.WATCHDOG_ENABLE false
 endif
 
+PRELOADER_ENABLE_ECC_SCRUBBING ?= 1
+ifeq ($(PRELOADER_ENABLE_ECC_SCRUBBING),1)
+# If enabled, we should scrub all 1GB of DDR. This may be overkill
+PRELOADER_EXTRA_ARGS += \
+	--set spl.boot.SDRAM_SCRUBBING true
+endif
+
+
 .PHONY: preloader
 preloader: $(PRELOADER_STAMP)
 
@@ -496,7 +515,7 @@ ifeq ($(SD_DRIVE_LETTER),)
 GUESS_DRIVE_LETTER = $(firstword $(foreach drive_letter,d e f g h i j k l m n o p q r s t u v w x y z,$(if $(wildcard $(drive_letter):/zImage),$(drive_letter))))
 SD_DRIVE_LETTER = $(GUESS_DRIVE_LETTER)
 endif # SD_DRIVE_LETTER == <empty>
-SDCARD ?= $(if $(SD_DRIVE_LETTER),-d $(SD_DRIVE_LETTER),$(error ERROR: SD_DRIVE_LETTER not specified. Try "make $(MAKECMDGOALS) SD_DRIVE_LETTER=[sd_card_windows_drive_letter]))
+SDCARD ?= $(if $(SD_DRIVE_LETTER),-d $(SD_DRIVE_LETTER),$(error ERROR: SD_DRIVE_LETTER not specified. Try "make $(MAKECMDGOALS) SD_DRIVE_LETTER=[sd_card_windows_drive_letter]"))
 endif # SDCARD == <empty>
 
 else # if not a Windows Host
@@ -526,9 +545,9 @@ sd-update-preloader-uboot: sd-update-preloader sd-update-uboot
 # Device Tree
 
 DTS.SOPC2DTS := sopc2dts
+DTS.DTC := dtc
 
 DTS.BOARDINFO ?= $(QSYS_BASE)_board_info.xml
-DTS.CLOCKINFO ?= hps_clock_info.xml
 DTS.COMMON ?= hps_common_board_info.xml
 
 DTS.EXTRA_DEPS += $(DTS.BOARDINFO) $(DTS.COMMON)
@@ -574,8 +593,8 @@ ifeq ($(HAVE_QSYS),1)
 $(DEVICE_TREE_BLOB): $(QSYS_STAMP)
 endif
 
-$(DEVICE_TREE_BLOB): %.dtb: %.sopcinfo $(DTS.EXTRA_DEPS)
-	$(call dts.sopc2dts,$<,$@,--type dtb)
+$(DEVICE_TREE_BLOB): %.dtb: %.dts
+	$(DTS.DTC) -I dts -O dtb -o $@ $<
 
 SCRUB_CLEAN_FILES += $(DEVICE_TREE_SOURCE) $(DEVICE_TREE_BLOB)
 
@@ -588,7 +607,7 @@ boot.script: Makefile
 	@$(ECHO) "Generating $@"
 	@$(ECHO) "fatload mmc 0:1 \$$fpgadata $(QUARTUS_RBF);" >>$@
 	@$(ECHO) "fpga load 0 \$$fpgadata \$$filesize;" >>$@
-	@$(ECHO) "set fdtimage $(DEVICE_TREE_BLOB);" >>$@
+	@$(ECHO) "setenv fdtimage $(DEVICE_TREE_BLOB);" >>$@
 	@$(ECHO) "run bridge_enable_handoff;" >>$@
 	@$(ECHO) "run mmcload;" >>$@
 	@$(ECHO) "run mmcboot;" >>$@
@@ -611,7 +630,7 @@ $(SD_FAT_TGZ): $(SD_FAT_TGZ_DEPS)
 .PHONY: sd-fat
 sd-fat: $(SD_FAT_TGZ)
 
-AR_FILES += $(SD_FAT_TGZ)
+AR_FILES += $(wildcard $(SD_FAT_TGZ))
 
 SCRUB_CLEAN_FILES += $(SD_FAT_TGZ)
 
@@ -697,7 +716,7 @@ help-init:
 	@$(ECHO) "*                                       *"
 	@$(ECHO) "* Manage QuartusII/QSys design          *"
 	@$(ECHO) "*                                       *"
-	@$(ECHO) "*     Copyright (c) 2014                *"
+	@$(ECHO) "*     Copyright (c) 2017                *"
 	@$(ECHO) "*     All Rights Reserved               *"
 	@$(ECHO) "*                                       *"
 	@$(ECHO) "*****************************************"
