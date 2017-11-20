@@ -15,7 +15,7 @@
 
 ################################################
 # sveinse: Files to keep from scrub
-FILES_KEEP = patches img
+FILES_KEEP = bin img patches
 FILES_FILTER_OUT =
 
 SHELL := /bin/bash
