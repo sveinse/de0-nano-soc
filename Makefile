@@ -774,9 +774,12 @@ SCRUB_CLEAN_FILES += $(CLEAN_FILES)
 HELP_TARGETS += scrub_clean
 scrub_clean.HELP := Restore design to its barebones state
 
-.PHONY: scrub scrub_clean
+.PHONY: scrub scrub_clean scrub_test
 scrub scrub_clean:
 	$(if $(strip $(wildcard $(SCRUB_CLEAN_FILES))),$(RM) $(wildcard $(SCRUB_CLEAN_FILES)),@$(ECHO) "You're already as clean as it gets!")
+scrub_test:
+	$(if $(strip $(wildcard $(SCRUB_CLEAN_FILES))),@$(ECHO) Scrub will delete: $(wildcard $(SCRUB_CLEAN_FILES)),@$(ECHO) "You're already as clean as it gets!")
+	
 
 .PHONY: tgz_scrub_clean
 tgz_scrub_clean:

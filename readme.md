@@ -43,7 +43,8 @@ To get full use of the makefile, please use it from the SoC EDS command shell.
 To clean an project directory use `make scrub`. Note that the cleaning is
 quite aggressive on unknown files, so be careful to not have other files in
 the project tree. The `Makefile` has a `FILES_KEEP=` setting close to
-protect files from being scrubbed.
+protect files from being scrubbed. `make scrub_test` can be used to show
+which files would be deleted by `make scrub`.
 
 
 ## Overview
