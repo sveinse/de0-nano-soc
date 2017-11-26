@@ -10,6 +10,7 @@ output_files/
 *_pin_model_dump.txt
 *.qws
 *.rpt
+*.bak
 
 # QSys file
 soc_system/
@@ -24,3 +25,7 @@ include/
 
 # Build system
 stamp/
+
+# Storage dirs
+tgz/
+

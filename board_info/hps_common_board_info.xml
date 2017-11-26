@@ -125,8 +125,7 @@ these aliases allows seamless support of multiple emacs
 <DTAppend name="reg" type="number" parentlabel="slot_0" val="0"/>
 <DTAppend name="bus-width" type="number" parentlabel="slot_0" val="4"/>
 
-<DTAppend name="reg" type="number" parentlabel="slot_0" val="0"/>
-<DTAppend name="bus-width" type="number" parentlabel="slot_0" val="4"/>
+<!-- The de0 don't have any cd (card detect) connected
 <DTAppend name="cd" parentlabel="hps_0_sdmmc" >
 	<val type="phandle">hps_0_gpio1_porta</val>
 	<val type="number">18</val>
@@ -137,10 +136,11 @@ these aliases allows seamless support of multiple emacs
 	<val type="number">18</val>
 	<val type="number">0</val>
 </DTAppend>
-
+-->
 
 <!-- _________________ SPI _________________  -->
 
+<!-- Creates core dump in kernel
 <DTAppend name="spidev@0" type="node" parentlabel="hps_0_spim0" newlabel="spidev0"/>
 <DTAppend name="compatible" type="string" parentlabel="spidev0" val="spidev"/>
 <DTAppend name="reg" type="number" parentlabel="spidev0" val="0"/>
@@ -152,7 +152,7 @@ these aliases allows seamless support of multiple emacs
 <DTAppend name="reg" type="number" parentlabel="spidev1" val="0"/>
 <DTAppend name="spi-max-frequency" type="number" parentlabel="spidev1" val="100000000"/>
 <DTAppend name="enable-dma" type="number" parentlabel="spidev1" val="1"/>
-
+-->
 
 <!-- _________________ LEDS AND GPIOS _________________  -->
 
